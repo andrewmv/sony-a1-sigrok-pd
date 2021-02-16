@@ -67,7 +67,7 @@ class Decoder(srd.Decoder):
 
     def handle_bit(self): 
         # Find falling edge
-        self.wait({0: 'f'})
+        self.wait({0: 'f', 0: 'l'})
         edge_start = self.samplenum
         if (self.bitcount == 0):
             self.byte_start = self.samplenum
@@ -81,7 +81,6 @@ class Decoder(srd.Decoder):
 
         if (pulse_width > PW_INIT):
             self.put(edge_start, edge_end, self.out_ann, [0, ["INIT", "IN"]])
-            self.state = STATE_READ_ADDR
             self.bitcount = 0
             self.databyte = 0
             return RC_INIT
@@ -97,16 +96,21 @@ class Decoder(srd.Decoder):
     def decode(self):
         while True:
             bit = self.handle_bit()
-            if (self.state == STATE_READ_ADDR):
+            if (bit == RC_INIT):
+                # Reset the state machine whenever we see an initialzation pulse
+                self.state = STATE_READ_ADDR
+            elif (self.state == STATE_READ_ADDR):
                 self.databyte = self.databyte | ((bit << (8 - self.bitcount)))
                 if (self.bitcount >= 8):
                     byte_end = self.samplenum
-                    self.put(self.byte_start, byte_end, self.out_ann, [1, ["Address: 0x{:X}".format(self.databyte), "ADDR: 0x{:X}".format(self.databyte), "0x{:X}".format(self.databyte), "{:X}".format(self.databyte)]])
+                    self.put(self.byte_start, byte_end, self.out_ann, [1, ["Address: 0x{:02X}".format(self.databyte), "ADDR: 0x{:02X}".format(self.databyte), "0x{:02X}".format(self.databyte), "{:02X}".format(self.databyte)]])
                     self.state = STATE_READ_CMD
                     self.bitcount = 0
+                    self.databyte = 0
             elif (self.state == STATE_READ_CMD):
                 self.databyte = self.databyte | ((bit << (8 - self.bitcount)))
                 if (self.bitcount >= 8):
                     byte_end = self.samplenum
-                    self.put(self.byte_start, byte_end, self.out_ann, [2, ["Command: 0x{:X}".format(self.databyte), "CMD: 0x{:X}".format(self.databyte), "0x{:X}".format(self.databyte), "{:X}".format(self.databyte)]])
+                    self.put(self.byte_start, byte_end, self.out_ann, [2, ["Command: 0x{:02X}".format(self.databyte), "CMD: 0x{:02X}".format(self.databyte), "0x{:02X}".format(self.databyte), "{:02X}".format(self.databyte)]])
                     self.bitcount = 0
+                    self.databyte = 0
