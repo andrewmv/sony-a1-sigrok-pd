@@ -65,6 +65,10 @@ class Decoder(srd.Decoder):
         self.state = STATE_FIND_INIT
         self.bitcount = 0
 
+    def reset(self):
+        self.state = STATE_FIND_INIT
+        self.bitcount = 0        
+
     def handle_bit(self): 
         # Find falling edge
         self.wait({0: 'f', 0: 'l'})
