@@ -129,26 +129,6 @@ class Decoder(srd.Decoder):
         self.lastbit = data
         edge_end  = self.samplenum
 
-        bitannotation = '0'
-        if data:
-            bitannotation = '1'
-            self.octet = self.octet | (128 >> self.bitcount)
-
-        if (self.state == STATE_FIND_BIT):
-            if (self.bitcount == 7):
-                self.byte_end = edge_end
-                self.bit_end[7] = edge_end
-                self.put(self.bit_start[7], edge_end, self.out_ann, [3, [bitannotation, ]])
-                self.put(self.byte_start, self.byte_end, self.out_ann, [4, ["Byte:{:02X}".format(self.octet), "{:02X}".format(self.octet)]])
-                self.push_byte_to_report(self.octet)
-                self.bitcount = 0
-                self.octet = 0x00
-                self.bytecount += 1
-            else:
-                if (self.bitcount == 0):
-                    self.byte_start = edge_start
-                self.bitcount += 1
-
         # Determine pulse width in microseconds
         pulse_width = ((edge_end - edge_start) / self.samplerate) * 1000 * 1000
 
@@ -180,6 +160,25 @@ class Decoder(srd.Decoder):
             self.put(edge_start, edge_end, self.out_ann, [2, ["MOSI Init", "Out", "S"]])
             return PULSE_MOSI_INIT
         else:   # Bit pulse 
+            bitannotation = '0'
+            if data:
+                bitannotation = '1'
+                self.octet = self.octet | (128 >> self.bitcount)
+
+            if (self.state == STATE_FIND_BIT):
+                if (self.bitcount == 7):
+                    self.byte_end = edge_end
+                    self.bit_end[7] = edge_end
+                    self.put(self.bit_start[7], edge_end, self.out_ann, [3, [bitannotation, ]])
+                    self.put(self.byte_start, self.byte_end, self.out_ann, [4, ["Byte:{:02X}".format(self.octet), "{:02X}".format(self.octet)]])
+                    self.push_byte_to_report(self.octet)
+                    self.bitcount = 0
+                    self.octet = 0x00
+                    self.bytecount += 1
+                else:
+                    if (self.bitcount == 0):
+                        self.byte_start = edge_start
+                    self.bitcount += 1
             return PULSE_BIT
 
     def decode(self):
@@ -198,11 +197,13 @@ class Decoder(srd.Decoder):
                 print("<<< ", end="")
                 self.print_byte_report(self.current_miso_packet)
                 self.last_miso_packet = self.current_miso_packet
+            self.current_miso_packet = bytearray()
         elif (self.direction == DIR_MOSI):
             if (self.current_mosi_packet != self.last_mosi_packet):
                 print(">>> ", end="")
                 self.print_byte_report(self.current_mosi_packet)
                 self.last_mosi_packet = self.current_mosi_packet
+            self.current_mosi_packet = bytearray()
 
     def print_byte_report(self, b):
         for i in b:
