@@ -15,8 +15,8 @@ import sigrokdecode as srd
 
 ## Timing - all values in microseconds
 
-MOSI_INIT_US = 70       # Averages 90
-MISO_INIT_US = 140      # Averages 160
+MISO_INIT_US = 70       # Averages 90
+MOSI_INIT_US = 140      # Averages 160
 BIT_US = 12             # 8 is highest recorded
 INIT_TIMEOUT_US = 800   # 545 is highest recorded
 
@@ -28,13 +28,13 @@ STATE_FIND_NEXT_BYTE = 2
 STATE_FIND_BIT = 3
 
 DIR_INIT = 0
-DIR_MOSI = 1
-DIR_MISO = 2
+DIR_MISO = 1
+DIR_MOSI = 2
 
 ## Pulse classifications
 PULSE_BOGUS = 0
-PULSE_MOSI_INIT = 1
-PULSE_MISO_INIT = 2
+PULSE_MISO_INIT = 1
+PULSE_MOSI_INIT = 2
 PULSE_BIT = 3
 
 class SamplerateError(Exception):
@@ -50,14 +50,14 @@ class Decoder(srd.Decoder):
     inputs = ['logic']
     outputs = ['Sony TTL']
     channels = (
-        {'id': 'data', 'name': 'DATA', 'desc': 'Muxed MOSI/MISO'},
+        {'id': 'data', 'name': 'DATA', 'desc': 'Muxed MISO/MOSI'},
         {'id': 'clock', 'name': 'CLK', 'desc': 'Serial data clock'},
     )
     options = (
     )
     annotations = (
-        ('MISO packet', 'In'),
-        ('MOSI packet', 'Out'),
+        ('MOSI packet', 'In'),
+        ('MISO packet', 'Out'),
         ('start', 'Start'),
         ('bits', 'Bits'),
         ('octets', 'Bytes')
@@ -79,10 +79,10 @@ class Decoder(srd.Decoder):
         self.octet = 0x00
         self.lastbit = 0
         self.bytecount = 0
-        self.current_miso_packet = bytearray()
         self.current_mosi_packet = bytearray()
-        self.last_miso_packet = bytearray()
+        self.current_miso_packet = bytearray()
         self.last_mosi_packet = bytearray()
+        self.last_miso_packet = bytearray()
 
     def metadata(self, key, value):
         if key == srd.SRD_CONF_SAMPLERATE:
@@ -95,10 +95,10 @@ class Decoder(srd.Decoder):
         self.direction = DIR_INIT
         self.bitcount = 0
         self.octet = 0x00
-        self.current_miso_packet = bytearray()
         self.current_mosi_packet = bytearray()
-        self.last_miso_packet = bytearray()
+        self.current_miso_packet = bytearray()
         self.last_mosi_packet = bytearray()
+        self.last_miso_packet = bytearray()
 
     def reset(self):
         self.state = STATE_FIND_INIT
@@ -106,10 +106,10 @@ class Decoder(srd.Decoder):
         self.bitcount = 0        
         self.octet = 0x00
         self.bytecount = 0
-        self.current_miso_packet = bytearray()
         self.current_mosi_packet = bytearray()
-        self.last_miso_packet = bytearray()
+        self.current_miso_packet = bytearray()
         self.last_mosi_packet = bytearray()
+        self.last_miso_packet = bytearray()
 
     def handle_pulse(self): 
         # Find rising clock edge
@@ -135,30 +135,30 @@ class Decoder(srd.Decoder):
         if (pulse_width > INIT_TIMEOUT_US):
             self.reset()
             return PULSE_BOGUS
-        elif (pulse_width > MOSI_INIT_US):
+        elif (pulse_width > MISO_INIT_US):
             self.close_byte_report()
             if (self.byte_end != 0):
-                if (self.direction == DIR_MISO):
-                    self.put(self.packet_start, self.byte_end, self.out_ann, [0, ["MISO Packet: {} bytes".format(str(self.bytecount)), "MISO", ]])
-                elif (self.direction == DIR_MOSI):
-                    self.put(self.packet_start, self.byte_end, self.out_ann, [1, ["MOSI Packet: {} bytes".format(str(self.bytecount)), "MOSI", ]])
+                if (self.direction == DIR_MOSI):
+                    self.put(self.packet_start, self.byte_end, self.out_ann, [0, ["MOSI Packet: {} bytes".format(str(self.bytecount)), "MOSI", ]])
+                elif (self.direction == DIR_MISO):
+                    self.put(self.packet_start, self.byte_end, self.out_ann, [1, ["MISO Packet: {} bytes".format(str(self.bytecount)), "MISO", ]])
 
-        if (pulse_width > MISO_INIT_US):
-            self.packet_start = edge_start
-            self.direction = DIR_MISO
-            self.state = STATE_FIND_BIT
-            self.bitcount = 0
-            self.bytecount = 0
-            self.put(edge_start, edge_end, self.out_ann, [2, ["MISO Init", "In", "S"]])
-            return PULSE_MISO_INIT
-        elif (pulse_width > MOSI_INIT_US):
+        if (pulse_width > MOSI_INIT_US):
             self.packet_start = edge_start
             self.direction = DIR_MOSI
             self.state = STATE_FIND_BIT
             self.bitcount = 0
             self.bytecount = 0
-            self.put(edge_start, edge_end, self.out_ann, [2, ["MOSI Init", "Out", "S"]])
+            self.put(edge_start, edge_end, self.out_ann, [2, ["MOSI Init", "In", "S"]])
             return PULSE_MOSI_INIT
+        elif (pulse_width > MISO_INIT_US):
+            self.packet_start = edge_start
+            self.direction = DIR_MISO
+            self.state = STATE_FIND_BIT
+            self.bitcount = 0
+            self.bytecount = 0
+            self.put(edge_start, edge_end, self.out_ann, [2, ["MISO Init", "Out", "S"]])
+            return PULSE_MISO_INIT
         else:   # Bit pulse 
             bitannotation = '0'
             if data:
@@ -186,24 +186,24 @@ class Decoder(srd.Decoder):
             pulse_type = self.handle_pulse()
 
     def push_byte_to_report(self, b):
-        if (self.direction == DIR_MISO):
-            self.current_miso_packet.append(b)
-        elif (self.direction == DIR_MOSI):
+        if (self.direction == DIR_MOSI):
             self.current_mosi_packet.append(b)
+        elif (self.direction == DIR_MISO):
+            self.current_miso_packet.append(b)
 
     def close_byte_report(self):
-        if (self.direction == DIR_MISO):
-            if (self.current_miso_packet != self.last_miso_packet):
-                print("<<< ", end="")
-                self.print_byte_report(self.current_miso_packet)
-                self.last_miso_packet = self.current_miso_packet
-            self.current_miso_packet = bytearray()
-        elif (self.direction == DIR_MOSI):
+        if (self.direction == DIR_MOSI):
             if (self.current_mosi_packet != self.last_mosi_packet):
-                print(">>> ", end="")
+                print("MOSI>>> ", end="")
                 self.print_byte_report(self.current_mosi_packet)
                 self.last_mosi_packet = self.current_mosi_packet
             self.current_mosi_packet = bytearray()
+        elif (self.direction == DIR_MISO):
+            if (self.current_miso_packet != self.last_miso_packet):
+                print("MISO<<< ", end="")
+                self.print_byte_report(self.current_miso_packet)
+                self.last_miso_packet = self.current_miso_packet
+            self.current_miso_packet = bytearray()
 
     def print_byte_report(self, b):
         for i in b:
