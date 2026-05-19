@@ -13,9 +13,9 @@
 
 import sigrokdecode as srd
 
-PW_INIT = 4700
-PW_ZERO = 380
-PW_ONE = 180
+PW_INIT = 4200
+PW_ZERO = 1400
+PW_ONE = 400
 
 RC_INIT = 3
 
@@ -74,21 +74,21 @@ class Decoder(srd.Decoder):
         self.bitcount = 0        
 
     def handle_pulse(self): 
-        # Find falling edge
-        self.wait({0: 'f'})
+        # Find rising edge
+        self.wait({0: 'r'})
         edge_start = self.samplenum
         if (self.bitcount == 0):
             self.byte_start = self.samplenum
 
-        # Find rising edge
-        self.wait({0: 'r'})
+        # Find falling edge
+        self.wait({0: 'f'})
         edge_end  = self.samplenum
 
         # Determine pulse width in microseconds
         pulse_width = ((edge_end - edge_start) / self.samplerate) * 1000 * 1000
 
         if (pulse_width > PW_INIT):
-            self.put(edge_start, edge_end, self.out_ann, [0, ["INIT", "IN"]])
+            self.put(edge_start, edge_end, self.out_ann, [0, ["START", "S"]])
             self.bitcount = 0
             self.databyte = 0
             return RC_INIT
