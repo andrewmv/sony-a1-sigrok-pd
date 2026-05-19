@@ -46,6 +46,7 @@ class Decoder(srd.Decoder):
     name = 'Sony TTL'
     longname = 'Sony TTL Flash Syncronization'
     desc = '125khz directionally mulitplexed SPI'
+    tags = ['Serial']
     license = 'gplv2+'
     inputs = ['logic']
     outputs = ['Sony TTL']
@@ -60,12 +61,14 @@ class Decoder(srd.Decoder):
         ('MISO packet', 'Out'),
         ('start', 'Start'),
         ('bits', 'Bits'),
-        ('octets', 'Bytes')
+        ('octets', 'Bytes'),
+        ('Power', 'Flash Power'),
     )
     annotation_rows = (
         ('direction', 'I/O', (0, 1, )),
-        ('bits', 'Bits', (2, 3, )),
-        ('octets', 'Bytes', (4, )),
+        ('bit', 'Bits', (2, 3, )),
+        ('octet', 'Bytes', (4, )),
+        ('power', "Flash Power", (5, )),
     )
 
     def __init__(self):
