@@ -16,6 +16,7 @@ import sigrokdecode as srd
 PW_INIT = 4200
 PW_ZERO = 1400
 PW_ONE = 400
+PW_MARK = 200
 
 RC_INIT = 3
 
@@ -58,6 +59,7 @@ class Decoder(srd.Decoder):
         self.samplerate = None
         self.bitcount = 0
         self.databyte = 0
+        self.last_falling_edge = 0
 
     def metadata(self, key, value):
         if key == srd.SRD_CONF_SAMPLERATE:
@@ -68,40 +70,53 @@ class Decoder(srd.Decoder):
         self.out_ann = self.register(srd.OUTPUT_ANN)
         self.state = STATE_FIND_INIT
         self.bitcount = 0
+        self.last_falling_edge = 0
 
     def reset(self):
         self.state = STATE_FIND_INIT
         self.bitcount = 0        
+        self.last_falling_edge = 0
 
     def handle_pulse(self): 
+        if (self.state == STATE_FIND_INIT):
+            # Find falling edge
+            self.wait({0: 'f'})
+            mark_start = self.samplenum
+        else:
+            mark_start = self.last_falling_edge
+
         # Find rising edge
         self.wait({0: 'r'})
         edge_start = self.samplenum
         if (self.bitcount == 0):
-            self.byte_start = self.samplenum
+            self.byte_start = mark_start
 
         # Find falling edge
         self.wait({0: 'f'})
-        edge_end  = self.samplenum
+        edge_end = self.samplenum
+        self.last_falling_edge = edge_end
 
-        # Determine pulse width in microseconds
-        pulse_width = ((edge_end - edge_start) / self.samplerate) * 1000 * 1000
+        # Determine mark width in microseconds
+        mark_width = ((edge_start - mark_start) / self.samplerate) * 1000 * 1000
 
-        if (pulse_width > PW_INIT):
-            self.put(edge_start, edge_end, self.out_ann, [0, ["START", "S"]])
+        # Determine space width in microseconds
+        space_width = ((edge_end - edge_start) / self.samplerate) * 1000 * 1000
+
+        if (space_width > PW_INIT):
+            self.put(mark_start, edge_end, self.out_ann, [0, ["START", "S"]])
             self.bitcount = 0
             self.databyte = 0
             return RC_INIT
-        elif (pulse_width > PW_ZERO):
-            self.put(edge_start, edge_end, self.out_ann, [0, ["0"]])
+        elif (space_width > PW_ZERO):
+            self.put(mark_start, edge_end, self.out_ann, [0, ["0"]])
             self.bitcount += 1
             return 0
-        # elif (pulse_width > PW_ONE):
-        #     self.put(edge_start, edge_end, self.out_ann, [0, ["1"]])
+        # elif (space_width > PW_ONE):
+        #     self.put(mark_start, edge_end, self.out_ann, [0, ["1"]])
         #     self.bitcount += 1
         #     return 1
         else: 
-            self.put(edge_start, edge_end, self.out_ann, [0, ["1"]])
+            self.put(mark_start, edge_end, self.out_ann, [0, ["1"]])
             self.bitcount += 1
             return 1
 
